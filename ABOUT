@@ -1,0 +1,7 @@
+ = QUBU - Quick User BackUp =
+
+QUBU is a in python writen tool that uses rsync to create snapshots of your $HOME.
+
+It use crond to schedul the backup task.
+
+The goal is to be minimalistic, simple, functional and to create backups, not to be very eyecandy.
