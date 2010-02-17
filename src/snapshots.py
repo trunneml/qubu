@@ -1,5 +1,6 @@
 #!/usr/bin/python
 # -*- coding: utf-8 -*-
+from __future__ import with_statement # This isn't required in Python 2.6
 import os
 import sys
 import getopt
@@ -9,15 +10,34 @@ import bz2
 import pwd
 import grp
 
+
+
 def cleanupPath( path):
 	return os.path.abspath(os.path.expanduser(path))
 
+class FilterFileError(Exception):
+	def __init__(self, value):
+		self.value = value
+	def __str__(self):
+		return repr(self.value)
+
 class Profile:
 	def __init__(self, filterFile):
-		self.sourceDirectory = sourceDir
-		self.snapshotDirectory = snapshotDir
 		self.filterFile = filterFile
-	
+		if not os.path.isfile(self.filterFile):
+			raise IOError(3, "Filter file %s not found" % self.filterFile)
+		with open(filterFile, "r") as ff:
+			sourceLine = ff.readline()
+			snapshotLine = ff.readline()
+		
+		if sourceLine[0] != "#":
+			raise FilterFileError('First line must be an source directory line')
+		if snapshotLine[0] != "#":
+			raise FilterFileError('Second line must be an source directory line')
+		self.sourceDirectory = sourceLine[1:].strip()
+		self.snapshotDirectory = snapshotLine[1:].strip()
+		
+
 	_sourceDirectory = None
 	def getSourceDirectory(self):
 		return cleanupPath(self._sourceDirectory)
@@ -45,6 +65,7 @@ class Snapshots:
 	RSYNCLOG = "rsync.log"
 	BACKUPDIR = "backup"
 	FILEINFO = "fileinfo.bz2"
+	RSYNCFILTERFILE = "rsync.rules"
 
 	def __init__(self, profile):
 		self.profile = profile
@@ -121,8 +142,12 @@ class Snapshots:
 		if rsyncReturnValue != 0:
 			raise RuntimeError(1, "rsync exit with %i exit code" % rsyncReturnValue)
 		
-		# Save permissions of Files
+		# Save permissions of all files
 		self.saveCurrentFileInfo(tmpSnapshot)
+		
+		# Save a copy of the filterFile
+		cmd = "cp %s %s" % (filterFile, os.path.join(tmpSnapshot, self.RSYNCFILTERFILE))
+		os.system( cmd )
 		
 		# Rename TMP folder to realname
 		os.rename( tmpSnapshot, newSnapshot )
@@ -143,9 +168,9 @@ class Snapshots:
 		fileinfo.close()
 
 if __name__ == "__main__":
-	if len(sys.argv) != 4:
+	if len(sys.argv) != 2:
 		sys.exit("Wrong parameter usage")
-	profile = Profile(sys.argv[1], sys.argv[2], sys.argv[3])
+	profile = Profile(sys.argv[1])
 	snap = Snapshots(profile)
 	print snap.takeSnapshot()
 
