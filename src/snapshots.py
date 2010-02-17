@@ -11,7 +11,6 @@ import pwd
 import grp
 
 
-
 def cleanupPath( path):
 	return os.path.abspath(os.path.expanduser(path))
 
@@ -113,11 +112,11 @@ class Snapshots:
 		
 		# Proof profile settings
 		if not os.path.isdir(snapshotDir):
-			raise IOError(1, "Snapshot directory %s is not a directory" % snapshotDir)
+			raise IOError(1, 'Snapshot directory "%s" is not a directory' % snapshotDir)
 		if not os.path.isdir(sourceDir):
-			raise IOError(2, "Source directory %s is not a directory" % sourceDir)
+			raise IOError(2, 'Source directory "%s" is not a directory' % sourceDir)
 		if not os.path.isfile(filterFile):
-			raise IOError(3, "Filter file %s not found" % filterFile)
+			raise IOError(3, 'Filter file "%s" not found' % filterFile)
 		
 		# Define folder names for tmp dir and new snapshot
 		newSnapshot = os.path.join(snapshotDir, self.generateSnapshotID())
