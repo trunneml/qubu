@@ -6,6 +6,8 @@ import sys
 import getopt
 import datetime
 
+import optparse
+
 import bz2
 import pwd
 import grp
@@ -118,6 +120,10 @@ class Snapshots:
 		if not os.path.isfile(filterFile):
 			raise IOError(3, 'Filter file "%s" not found' % filterFile)
 		
+		# RSYNC don't like in our case a / at the end of the source folder
+		if sourceDir[-1] == "/":
+			sourceDir = sourceDir[:-1]
+		
 		# Define folder names for tmp dir and new snapshot
 		newSnapshot = os.path.join(snapshotDir, self.generateSnapshotID())
 		tmpSnapshot = os.path.join(snapshotDir, "tmpnew")
@@ -134,9 +140,10 @@ class Snapshots:
 		if lastSnapshot:
 			cmd += ' --link-dest="%s"' % os.path.join(lastSnapshot, self.BACKUPDIR)
 		cmd += ' --include-from="%s"' % filterFile
-		cmd += ' "%s" "%s"' % (sourceDir, os.path.join(tmpSnapshot, self.BACKUPDIR))
+		cmd += ' "%s" "%s"' % (sourceDir, cleanupPath(os.path.join(tmpSnapshot, self.BACKUPDIR)))
 		cmd += ' > %s' % os.path.join(tmpSnapshot, self.RSYNCLOG)
 		# Run RSYNC and proof return value
+		print cmd
 		rsyncReturnValue = os.system( cmd )
 		if rsyncReturnValue != 0:
 			raise RuntimeError(1, "rsync exit with %i exit code" % rsyncReturnValue)
@@ -166,10 +173,61 @@ class Snapshots:
 					fileinfo.write("%s %s %s %s\n" % ( info[0], info[1], info[2], item_path ))
 		fileinfo.close()
 
-if __name__ == "__main__":
-	if len(sys.argv) != 2:
-		sys.exit("Wrong parameter usage")
-	profile = Profile(sys.argv[1])
+	def restoreFromPath(self, path):
+		snapshotDir = self.profile.snapshotDirectory
+		path = cleanupPath(path)
+		prefix = os.path.commonprefix( [snapshotDir, path])
+		if prefix != snapshotDir:
+			raise FilterFileError('%s belongs not to filter file %s' % (path, self.profile.filterFile ))
+		if prefix[-1] != "/":
+			prefix += "/"
+		path = path [len(prefix) :]
+		pathParts =  path.split('/',2)
+		if len(pathParts) <= 1:
+			raise IOError(1, "Restore path is invalid")
+		if len(pathParts) == 2:
+			restorePath = ""
+		else:
+			restorePath = pathParts[2]
+		snapshotPath = os.path.join(snapshotDir, pathParts[0])
+		self.restoreFromSnapshot(snapshotPath,restorePath)
+
+	def restoreFromSnapshot(self, snapshotPath, restorePath):
+		sourceDir = self.profile.sourceDirectory
+		# We wan't to remove the last part of the sourceDir path with
+		# os.path.split. With an tailing / that won't work
+		if sourceDir[-1] == "/":
+			sourceDir = sourceDir[:-1]
+		restoreDestination = cleanupPath(os.path.join(os.path.split(sourceDir)[0], restorePath))
+		restoreSource = cleanupPath(os.path.join(snapshotPath, self.BACKUPDIR, restorePath))
+		cmd  = "rsync -avEAXH --copy-unsafe-links --whole-file"
+		cmd += " --dry-run"
+		cmd += " --backup --suffix=.%s" % self.generateSnapshotID()
+		cmd += " \"%s\" \"%s\"" % (restoreSource, os.path.split(restoreDestination)[0])
+		print cmd
+		retVal = os.system( cmd )
+		return retVal == 0
+
+def main():
+	usage = "usage: %prog [options] profile"
+	parser = optparse.OptionParser(usage=usage)
+	#parser.add_option("-p", "--profile", dest="profileFile", help="PATH to QUBU profile", metavar="PATH")
+	parser.add_option("-r", "--restore", dest="restorePath", help="restore PATH from snapshot (Full path including snapshot path)", metavar="PATH")
+	(options, args) = parser.parse_args()
+	if len(args) != 1:
+		sys.exit("Missing profile file argument")
+	profile = Profile(args[0])
 	snap = Snapshots(profile)
-	print snap.takeSnapshot()
+	if options.restorePath:
+		try:
+			snap.restoreFromPath(options.restorePath)
+		except FilterFileError as e:
+			print "ERROR: %s" % e
+		except IOError as e:
+			print "ERROR: %s" % e			
+	else:
+		path = snap.takeSnapshot()
+
+if __name__ == "__main__":
+	main()
 
