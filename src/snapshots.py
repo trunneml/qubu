@@ -5,11 +5,15 @@ import sys
 import getopt
 import datetime
 
+import bz2
+import pwd
+import grp
+
 def cleanupPath( path):
 	return os.path.abspath(os.path.expanduser(path))
 
 class Profile:
-	def __init__(self, sourceDir, snapshotDir, filterFile):
+	def __init__(self, filterFile):
 		self.sourceDirectory = sourceDir
 		self.snapshotDirectory = snapshotDir
 		self.filterFile = filterFile
@@ -40,6 +44,7 @@ class Snapshots:
 
 	RSYNCLOG = "rsync.log"
 	BACKUPDIR = "backup"
+	FILEINFO = "fileinfo.bz2"
 
 	def __init__(self, profile):
 		self.profile = profile
@@ -59,6 +64,26 @@ class Snapshots:
 	def generateSnapshotID(self):
 		return datetime.datetime.today().strftime( '%Y%m%d-%H%M%S' )
 
+	def _getCurrentInfo( self, path ):
+		sourceDir = self.profile.sourceDirectory
+		path = os.path.join( sourceDir, path)
+		try:
+			info = os.stat( path )
+			user = '-'
+			group = '-'
+
+			try:
+				user = pwd.getpwuid( info.st_uid ).pw_name
+			except:
+				pass
+			try:
+				group = grp.getgrgid( info.st_gid ).gr_name
+			except:
+				pass
+
+			return  ( info.st_mode, user, group)
+		except:
+			return None
 
 	def takeSnapshot(self):
 		snapshotDir = self.profile.snapshotDirectory
@@ -96,10 +121,26 @@ class Snapshots:
 		if rsyncReturnValue != 0:
 			raise RuntimeError(1, "rsync exit with %i exit code" % rsyncReturnValue)
 		
+		# Save permissions of Files
+		self.saveCurrentFileInfo(tmpSnapshot)
+		
 		# Rename TMP folder to realname
 		os.rename( tmpSnapshot, newSnapshot )
 		# Return path to new snapshot
 		return newSnapshot
+
+	def saveCurrentFileInfo(self, snapshotPath):
+		fileinfo = bz2.BZ2File( os.path.join(snapshotPath, self.FILEINFO), 'w' )
+		for path, dirs, files in os.walk( os.path.join(snapshotPath, self.BACKUPDIR) ):
+			dirs.extend( files )
+			for item in dirs:
+				item_path = os.path.join( path, item )[ len( os.path.join(snapshotPath, self.BACKUPDIR) ) : ]
+				if item_path[0] == "/":
+					item_path = item_path[1:]
+				info = self._getCurrentInfo( item_path )
+				if info:
+					fileinfo.write("%s %s %s %s\n" % ( info[0], info[1], info[2], item_path ))
+		fileinfo.close()
 
 if __name__ == "__main__":
 	if len(sys.argv) != 4:
