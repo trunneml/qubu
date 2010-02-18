@@ -120,9 +120,9 @@ class Snapshots:
 		if not os.path.isfile(filterFile):
 			raise IOError(3, 'Filter file "%s" not found' % filterFile)
 		
-		# RSYNC don't like in our case a / at the end of the source folder
-		if sourceDir[-1] == "/":
-			sourceDir = sourceDir[:-1]
+		# RSYNC behaves different with a / at the end of the source folder
+		if sourceDir[-1] != "/":
+			sourceDir += "/"
 		
 		# Define folder names for tmp dir and new snapshot
 		newSnapshot = os.path.join(snapshotDir, self.generateSnapshotID())
@@ -143,7 +143,6 @@ class Snapshots:
 		cmd += ' "%s" "%s"' % (sourceDir, cleanupPath(os.path.join(tmpSnapshot, self.BACKUPDIR)))
 		cmd += ' > %s' % os.path.join(tmpSnapshot, self.RSYNCLOG)
 		# Run RSYNC and proof return value
-		print cmd
 		rsyncReturnValue = os.system( cmd )
 		if rsyncReturnValue != 0:
 			raise RuntimeError(1, "rsync exit with %i exit code" % rsyncReturnValue)
@@ -193,17 +192,20 @@ class Snapshots:
 		self.restoreFromSnapshot(snapshotPath,restorePath)
 
 	def restoreFromSnapshot(self, snapshotPath, restorePath):
+		print snapshotPath, restorePath
 		sourceDir = self.profile.sourceDirectory
 		# We wan't to remove the last part of the sourceDir path with
 		# os.path.split. With an tailing / that won't work
 		if sourceDir[-1] == "/":
 			sourceDir = sourceDir[:-1]
-		restoreDestination = cleanupPath(os.path.join(os.path.split(sourceDir)[0], restorePath))
-		restoreSource = cleanupPath(os.path.join(snapshotPath, self.BACKUPDIR, restorePath))
+		restoreDestination = cleanupPath(os.path.join(sourceDir, restorePath))
+		restoreSource = os.path.join(snapshotPath, self.BACKUPDIR, restorePath)
+		if os.path.isdir(restoreSource):
+			restoreSource += "/"
 		cmd  = "rsync -avEAXH --copy-unsafe-links --whole-file"
 		cmd += " --dry-run"
 		cmd += " --backup --suffix=.%s" % self.generateSnapshotID()
-		cmd += " \"%s\" \"%s\"" % (restoreSource, os.path.split(restoreDestination)[0])
+		cmd += " \"%s\" \"%s\"" % (restoreSource, restoreDestination)
 		print cmd
 		retVal = os.system( cmd )
 		return retVal == 0
@@ -224,7 +226,7 @@ def main():
 		except FilterFileError as e:
 			print "ERROR: %s" % e
 		except IOError as e:
-			print "ERROR: %s" % e			
+			print "ERROR: %s" % e
 	else:
 		path = snap.takeSnapshot()
 
