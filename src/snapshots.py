@@ -6,12 +6,16 @@ import sys
 import getopt
 import datetime
 
+# To improve usability on the console
 import optparse
+import logging
 
+# Needed to save file permissions
 import bz2
 import pwd
 import grp
 
+logger = None
 
 def cleanupPath( path):
 	return os.path.abspath(os.path.expanduser(path))
@@ -24,6 +28,7 @@ class FilterFileError(Exception):
 
 class Profile:
 	def __init__(self, filterFile):
+		logger.info("Loading qubu filter file")
 		self.filterFile = filterFile
 		if not os.path.isfile(self.filterFile):
 			raise IOError(3, "Filter file %s not found" % self.filterFile)
@@ -36,7 +41,9 @@ class Profile:
 		if snapshotLine[0] != "#":
 			raise FilterFileError('Second line must be an source directory line')
 		self.sourceDirectory = sourceLine[1:].strip()
+		logger.info("Setting source directory to: %s" % self.sourceDirectory)
 		self.snapshotDirectory = snapshotLine[1:].strip()
+		logger.info("Setting snapshot directory to: %s" % self.snapshotDirectory)
 		
 
 	_sourceDirectory = None
@@ -80,7 +87,10 @@ class Snapshots:
 		snapshots.sort(None, lambda x: os.path.getctime(os.path.join(snapshotDir, x)) )
 		# return latest snapshot
 		if len(snapshots):
-			return cleanupPath(os.path.join(snapshotDir,snapshots[-1]))
+			snap = cleanupPath(os.path.join(snapshotDir,snapshots[-1]))
+			logger.info("Latest snapshot found in: %s" % snap)
+			return snap
+		logger.warn("No snapshot found in snapshot directory (%s)" % snap)
 		return None
 
 	def generateSnapshotID(self):
@@ -112,6 +122,7 @@ class Snapshots:
 		sourceDir = self.profile.sourceDirectory
 		filterFile = self.profile.filterFile
 		
+		logger.info("Checking snapshot configuration")
 		# Proof profile settings
 		if not os.path.isdir(snapshotDir):
 			raise IOError(1, 'Snapshot directory "%s" is not a directory' % snapshotDir)
@@ -128,14 +139,18 @@ class Snapshots:
 		newSnapshot = os.path.join(snapshotDir, self.generateSnapshotID())
 		tmpSnapshot = os.path.join(snapshotDir, "tmpnew")
 		if os.path.exists(tmpSnapshot):
+			logger.warn("Removing unfinished snapshot in tmp folder")
+			logger.debug( "Running command: %s" % cmd) 
 			os.system( 'rm -Rf "%s"' % tmpSnapshot)
 		
 		lastSnapshot = self.getLastSnapshot()
 		
 		# Create TMP Folder for new Snapshot
+		logger.info("Creating tmp folder for snapshot")
 		os.mkdir(tmpSnapshot, 0700)
 		
 		# Create Rsync CMD
+		logger.info("Starting rsync")
 		cmd  = 'rsync -aEAXHi'
 		if lastSnapshot:
 			cmd += ' --link-dest="%s"' % os.path.join(lastSnapshot, self.BACKUPDIR)
@@ -143,6 +158,7 @@ class Snapshots:
 		cmd += ' "%s" "%s"' % (sourceDir, cleanupPath(os.path.join(tmpSnapshot, self.BACKUPDIR)))
 		cmd += ' > %s' % os.path.join(tmpSnapshot, self.RSYNCLOG)
 		# Run RSYNC and proof return value
+		logger.debug( "Running command: %s" % cmd) 
 		rsyncReturnValue = os.system( cmd )
 		if rsyncReturnValue != 0:
 			raise RuntimeError(1, "rsync exit with %i exit code" % rsyncReturnValue)
@@ -151,15 +167,19 @@ class Snapshots:
 		self.saveCurrentFileInfo(tmpSnapshot)
 		
 		# Save a copy of the filterFile
+		logger.info("Copy qubu filter file")
 		cmd = "cp %s %s" % (filterFile, os.path.join(tmpSnapshot, self.RSYNCFILTERFILE))
+		logger.debug( "Running command: %s" % cmd) 
 		os.system( cmd )
 		
 		# Rename TMP folder to realname
 		os.rename( tmpSnapshot, newSnapshot )
 		# Return path to new snapshot
+		logger.info("New snapshot (%s) created" % newSnapshot)
 		return newSnapshot
 
 	def saveCurrentFileInfo(self, snapshotPath):
+		logger.info("Safe file permissions")
 		fileinfo = bz2.BZ2File( os.path.join(snapshotPath, self.FILEINFO), 'w' )
 		for path, dirs, files in os.walk( os.path.join(snapshotPath, self.BACKUPDIR) ):
 			dirs.extend( files )
@@ -203,14 +223,16 @@ class Snapshots:
 		if os.path.isdir(restoreSource):
 			restoreSource += "/"
 		cmd  = "rsync -avEAXH --copy-unsafe-links --whole-file"
-		cmd += " --dry-run"
 		cmd += " --backup --suffix=.%s" % self.generateSnapshotID()
 		cmd += " \"%s\" \"%s\"" % (restoreSource, restoreDestination)
-		print cmd
+		logger.debug( "Running command: %s" % cmd) 
 		retVal = os.system( cmd )
 		return retVal == 0
 
 def main():
+	global logger
+	logging.basicConfig(level=logging.INFO)
+	logger = logging.getLogger('qubu')
 	usage = "usage: %prog [options] profile"
 	parser = optparse.OptionParser(usage=usage)
 	#parser.add_option("-p", "--profile", dest="profileFile", help="PATH to QUBU profile", metavar="PATH")
