@@ -108,7 +108,7 @@ class Snapshots:
 			snap = cleanupPath(os.path.join(snapshotDir,snapshots[-1]))
 			logger.info("Latest snapshot found in: %s" % snap)
 			return snap
-		logger.warn("No snapshot found in snapshot directory (%s)" % snap)
+		logger.warn("No snapshot found in snapshot directory (%s)" % snapshotDir)
 		return None
 
 	def generateSnapshotID(self):
