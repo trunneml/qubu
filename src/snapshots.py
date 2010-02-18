@@ -156,7 +156,8 @@ class Snapshots:
 		notify("backup_started", "Starting Backup")
 		
 		# Define folder names for tmp dir and new snapshot
-		newSnapshot = os.path.join(snapshotDir, self.generateSnapshotID())
+		snapshotID = self.generateSnapshotID()
+		newSnapshot = os.path.join(snapshotDir, snapshotID)
 		tmpSnapshot = os.path.join(snapshotDir, "tmpnew")
 		if os.path.exists(tmpSnapshot):
 			logger.warn("Found tmp folder! Maybe backup is already running")
@@ -194,8 +195,8 @@ class Snapshots:
 		# Rename TMP folder to realname
 		os.rename( tmpSnapshot, newSnapshot )
 		# Return path to new snapshot
-		logger.info("New snapshot (%s) created" % newSnapshot)
-		notify("backup_stopped", "New snapshot (%s) created" % newSnapshot)
+		logger.info("New snapshot %s created" % snapshotID)
+		notify("backup_stopped", "New snapshot %s created" % snapshotID)
 		return newSnapshot
 
 	def saveCurrentFileInfo(self, snapshotPath):
