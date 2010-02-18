@@ -15,7 +15,25 @@ import bz2
 import pwd
 import grp
 
+# Make some fancy PopUps under KDE4
+import dbus
+
 logger = None
+knotifyAppName = "qubu"
+
+try:
+	if "DISPLAY" not in os.environ:
+		os.environ["DISPLAY"] = ":0"
+	knotifyDbus = dbus.SessionBus().get_object("org.kde.knotify", "/Notify")
+except:
+	knotifyDbus = None
+
+def notify(event, msg, context=[], timeout=5000):
+	headline = ""
+	if not knotifyDbus:
+		return False
+	return knotifyDbus.event(event, knotifyAppName , context, headline, msg, [0,0,0,0], [], timeout, 0, dbus_interface='org.kde.KNotify')
+
 
 def cleanupPath( path):
 	return os.path.abspath(os.path.expanduser(path))
@@ -135,6 +153,8 @@ class Snapshots:
 		if sourceDir[-1] != "/":
 			sourceDir += "/"
 		
+		notify("backup_started", "Starting Backup")
+		
 		# Define folder names for tmp dir and new snapshot
 		newSnapshot = os.path.join(snapshotDir, self.generateSnapshotID())
 		tmpSnapshot = os.path.join(snapshotDir, "tmpnew")
@@ -176,6 +196,7 @@ class Snapshots:
 		os.rename( tmpSnapshot, newSnapshot )
 		# Return path to new snapshot
 		logger.info("New snapshot (%s) created" % newSnapshot)
+		notify("backup_stopped", "New snapshot (%s) created" % newSnapshot)
 		return newSnapshot
 
 	def saveCurrentFileInfo(self, snapshotPath):
@@ -231,13 +252,18 @@ class Snapshots:
 
 def main():
 	global logger
-	logging.basicConfig(level=logging.INFO)
-	logger = logging.getLogger('qubu')
 	usage = "usage: %prog [options] profile"
 	parser = optparse.OptionParser(usage=usage)
 	#parser.add_option("-p", "--profile", dest="profileFile", help="PATH to QUBU profile", metavar="PATH")
 	parser.add_option("-r", "--restore", dest="restorePath", help="restore PATH from snapshot (Full path including snapshot path)", metavar="PATH")
+	parser.add_option("-q", "--quiet", dest="quiet", action="store_true", help="Increase Verbose Level (only Warnings and above)")
 	(options, args) = parser.parse_args()
+	if options.quiet:
+		logging.basicConfig(level=logging.WARNING)
+		logger = logging.getLogger('qubu')
+	else:
+		logging.basicConfig(level=logging.INFO)
+		logger = logging.getLogger('qubu')
 	if len(args) != 1:
 		sys.exit("Missing profile file argument")
 	profile = Profile(args[0])
