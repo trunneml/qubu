@@ -159,9 +159,8 @@ class Snapshots:
 		newSnapshot = os.path.join(snapshotDir, self.generateSnapshotID())
 		tmpSnapshot = os.path.join(snapshotDir, "tmpnew")
 		if os.path.exists(tmpSnapshot):
-			logger.warn("Removing unfinished snapshot in tmp folder")
-			logger.debug( "Running command: %s" % cmd) 
-			os.system( 'rm -Rf "%s"' % tmpSnapshot)
+			logger.warn("Found tmp folder! Maybe backup is already running")
+			return False
 		
 		lastSnapshot = self.getLastSnapshot()
 		
