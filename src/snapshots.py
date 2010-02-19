@@ -15,7 +15,7 @@ import bz2
 import pwd
 import grp
 
-# Make some fancy PopUps under KDE4
+# Make some fancy PopUps under KDE4 and Gnome
 import dbus
 
 logger = None
