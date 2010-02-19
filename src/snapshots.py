@@ -67,6 +67,7 @@ class Profile:
 		with open(filterFile, "r") as ff:
 			sourceLine = ff.readline()
 			snapshotLine = ff.readline()
+			rsyncCMDLine = ff.readline()
 		
 		if sourceLine[0] != "#":
 			raise FilterFileError('First line must be an source directory line')
@@ -76,6 +77,9 @@ class Profile:
 		logger.info("Setting source directory to: %s" % self.sourceDirectory)
 		self.snapshotDirectory = snapshotLine[1:].strip()
 		logger.info("Setting snapshot directory to: %s" % self.snapshotDirectory)
+		self.rsyncCMD = "rsync -aEAXH"
+		if rsyncCMDLine[0] == "#":
+			self.rsyncCMD = rsyncCMDLine[1:].strip()
 		
 
 	_sourceDirectory = None
@@ -153,6 +157,7 @@ class Snapshots:
 		snapshotDir = self.profile.snapshotDirectory
 		sourceDir = self.profile.sourceDirectory
 		filterFile = self.profile.filterFile
+		rsyncCMD = self.profile.rsyncCMD
 		
 		logger.info("Checking snapshot configuration")
 		# Proof profile settings
@@ -184,7 +189,7 @@ class Snapshots:
 		
 		# Create Rsync CMD
 		logger.info("Starting rsync")
-		cmd  = 'rsync -aEAXHi'
+		cmd  = '%s -i' % rsyncCMD
 		if lastSnapshot:
 			cmd += ' --link-dest="%s"' % os.path.join(lastSnapshot, self.BACKUPDIR)
 		cmd += ' --include-from="%s"' % filterFile
@@ -246,7 +251,7 @@ class Snapshots:
 		self.restoreFromSnapshot(snapshotPath,restorePath)
 
 	def restoreFromSnapshot(self, snapshotPath, restorePath):
-		print snapshotPath, restorePath
+		logger.info('Restoring "%s" out of snapshot "%s"' % (restorePath, snapshotPath))
 		sourceDir = self.profile.sourceDirectory
 		# We wan't to remove the last part of the sourceDir path with
 		# os.path.split. With an tailing / that won't work
@@ -256,7 +261,7 @@ class Snapshots:
 		restoreSource = os.path.join(snapshotPath, self.BACKUPDIR, restorePath)
 		if os.path.isdir(restoreSource):
 			restoreSource += "/"
-		cmd  = "rsync -avEAXH --copy-unsafe-links --whole-file"
+		cmd  = "%s --copy-unsafe-links --whole-file" % self.profile.rsyncCMD
 		cmd += " --backup --suffix=.%s" % self.generateSnapshotID()
 		cmd += " \"%s\" \"%s\"" % (restoreSource, restoreDestination)
 		logger.debug( "Running command: %s" % cmd) 
@@ -270,9 +275,12 @@ def main():
 	parser = optparse.OptionParser(usage=usage)
 	#parser.add_option("-p", "--profile", dest="profileFile", help="PATH to QUBU profile", metavar="PATH")
 	parser.add_option("-r", "--restore", dest="restorePath", help="restore PATH from snapshot (Full path including snapshot path)", metavar="PATH")
-	parser.add_option("-q", "--quiet", dest="quiet", action="store_true", help="Increase Verbose Level (only Warnings and above)")
+	parser.add_option("-q", "--quiet", dest="quiet", action="store_true", help="Decrease Verbose Level (only Warnings and above)")
+	parser.add_option("-d", "--debug", dest="debug", action="store_true", help="Debug Output")
 	(options, args) = parser.parse_args()
-	if options.quiet:
+	if options.debug:
+		logging.basicConfig(level=logging.DEBUG)
+	elif options.quiet:
 		logging.basicConfig(level=logging.WARNING)
 	else:
 		logging.basicConfig(level=logging.INFO)
@@ -295,4 +303,3 @@ def main():
 
 if __name__ == "__main__":
 	main()
-
