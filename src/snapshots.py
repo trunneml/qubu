@@ -52,29 +52,6 @@ class Notify:
 		#self.notifyDbus.Notify("noteer", 0, "document-save", "Headline", m, [], {"category" : "transfer" }, 0, dbus_interface='org.freedesktop.Notifications')
 		return self.notifyDbus.Notify(appName, 0, "document-save", headline, msg, [], hints, self.TIMEOUT, dbus_interface='org.freedesktop.Notifications')
 
-class KNotify(Notify):
-	def __init__(self):
-		try:
-			if "DISPLAY" not in os.environ:
-				os.environ["DISPLAY"] = ":0"
-			self.knotifyDbus = dbus.SessionBus().get_object("org.kde.knotify", "/Notify")
-		except:
-			self.knotifyDbus = None
-
-	def notify(self, eventType, msg):
-		headline = ""
-		if not self.knotifyDbus:
-			return False
-		headline = ""
-		event = "backup_started"
-		if eventType == self.STARTBACKUP:
-			headline = "Start Backup"
-			event = "backup_started"
-		elif event == self.STOPBACKUP:
-			event = "backup_stopped"
-			headline = "Backup Stopped"
-		return self.knotifyDbus.event(event, appName, [], headline, msg, [0,0,0,0], [], self.TIMEOUT, 0, dbus_interface='org.kde.KNotify')
-
 class FilterFileError(Exception):
 	def __init__(self, value):
 		self.value = value
@@ -294,19 +271,13 @@ def main():
 	#parser.add_option("-p", "--profile", dest="profileFile", help="PATH to QUBU profile", metavar="PATH")
 	parser.add_option("-r", "--restore", dest="restorePath", help="restore PATH from snapshot (Full path including snapshot path)", metavar="PATH")
 	parser.add_option("-q", "--quiet", dest="quiet", action="store_true", help="Increase Verbose Level (only Warnings and above)")
-	parser.add_option("-k", "--knotify", dest="knotify", action="store_true", help="Use KNotify(KDE4) instead  of Galeon(GTK+KDE4)")
 	(options, args) = parser.parse_args()
 	if options.quiet:
 		logging.basicConfig(level=logging.WARNING)
 	else:
 		logging.basicConfig(level=logging.INFO)
 	logger = logging.getLogger(appName)
-	if options.knotify:
-		logger.info("Using KNotify for notificaytions")
-		notify = KNotify()
-	else:
-		logger.info("Using Galeon for notificaytions")
-		notify = Notify()
+	notify = Notify()
 		
 	if len(args) != 1:
 		sys.exit("Missing profile file argument")
