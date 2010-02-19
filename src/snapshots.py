@@ -19,24 +19,61 @@ import grp
 import dbus
 
 logger = None
-knotifyAppName = "qubu"
-
-try:
-	if "DISPLAY" not in os.environ:
-		os.environ["DISPLAY"] = ":0"
-	knotifyDbus = dbus.SessionBus().get_object("org.kde.knotify", "/Notify")
-except:
-	knotifyDbus = None
-
-def notify(event, msg, context=[], timeout=5000):
-	headline = ""
-	if not knotifyDbus:
-		return False
-	return knotifyDbus.event(event, knotifyAppName , context, headline, msg, [0,0,0,0], [], timeout, 0, dbus_interface='org.kde.KNotify')
-
+notify = None
+appName = "qubu"
 
 def cleanupPath( path):
 	return os.path.abspath(os.path.expanduser(path))
+
+class Notify:
+
+	STARTBACKUP = 1
+	STOPBACKUP = 2
+	TIMEOUT = 5000
+	
+	def __init__(self):
+		try:
+			if "DISPLAY" not in os.environ:
+				os.environ["DISPLAY"] = ":0"
+			self.notifyDbus = dbus.SessionBus().get_object("org.freedesktop.Notifications", "/org/freedesktop/Notifications")
+		except:
+			self.notifyDbus = None
+
+	def notify(self, eventType, msg):
+		headline = ""
+		if not self.notifyDbus:
+			return False
+		headline = ""
+		hints = {"category" : "transfer"}
+		if eventType == self.STARTBACKUP:
+			hints = {"category" : "transfer", "urgency" : 0}
+		elif eventType == self.STOPBACKUP:
+			hints = {"category" : "transfer.complete", "urgency" : 0}
+		#self.notifyDbus.Notify("noteer", 0, "document-save", "Headline", m, [], {"category" : "transfer" }, 0, dbus_interface='org.freedesktop.Notifications')
+		return self.notifyDbus.Notify(appName, 0, "document-save", headline, msg, [], hints, self.TIMEOUT, dbus_interface='org.freedesktop.Notifications')
+
+class KNotify(Notify):
+	def __init__(self):
+		try:
+			if "DISPLAY" not in os.environ:
+				os.environ["DISPLAY"] = ":0"
+			self.knotifyDbus = dbus.SessionBus().get_object("org.kde.knotify", "/Notify")
+		except:
+			self.knotifyDbus = None
+
+	def notify(self, eventType, msg):
+		headline = ""
+		if not self.knotifyDbus:
+			return False
+		headline = ""
+		event = "backup_started"
+		if eventType == self.STARTBACKUP:
+			headline = "Start Backup"
+			event = "backup_started"
+		elif event == self.STOPBACKUP:
+			event = "backup_stopped"
+			headline = "Backup Stopped"
+		return self.knotifyDbus.event(event, appName, [], headline, msg, [0,0,0,0], [], self.TIMEOUT, 0, dbus_interface='org.kde.KNotify')
 
 class FilterFileError(Exception):
 	def __init__(self, value):
@@ -152,8 +189,7 @@ class Snapshots:
 		# RSYNC behaves different with a / at the end of the source folder
 		if sourceDir[-1] != "/":
 			sourceDir += "/"
-		
-		notify("backup_started", "Starting Backup")
+		notify.notify(Notify.STARTBACKUP, "Starting Backup")
 		
 		# Define folder names for tmp dir and new snapshot
 		snapshotID = self.generateSnapshotID()
@@ -196,7 +232,7 @@ class Snapshots:
 		os.rename( tmpSnapshot, newSnapshot )
 		# Return path to new snapshot
 		logger.info("New snapshot %s created" % snapshotID)
-		notify("backup_stopped", "New snapshot %s created" % snapshotID)
+		notify.notify(Notify.STOPBACKUP, "New snapshot %s created" % snapshotID)
 		return newSnapshot
 
 	def saveCurrentFileInfo(self, snapshotPath):
@@ -252,18 +288,26 @@ class Snapshots:
 
 def main():
 	global logger
+	global notify
 	usage = "usage: %prog [options] profile"
 	parser = optparse.OptionParser(usage=usage)
 	#parser.add_option("-p", "--profile", dest="profileFile", help="PATH to QUBU profile", metavar="PATH")
 	parser.add_option("-r", "--restore", dest="restorePath", help="restore PATH from snapshot (Full path including snapshot path)", metavar="PATH")
 	parser.add_option("-q", "--quiet", dest="quiet", action="store_true", help="Increase Verbose Level (only Warnings and above)")
+	parser.add_option("-k", "--knotify", dest="knotify", action="store_true", help="Use KNotify(KDE4) instead  of Galeon(GTK+KDE4)")
 	(options, args) = parser.parse_args()
 	if options.quiet:
 		logging.basicConfig(level=logging.WARNING)
-		logger = logging.getLogger('qubu')
 	else:
 		logging.basicConfig(level=logging.INFO)
-		logger = logging.getLogger('qubu')
+	logger = logging.getLogger(appName)
+	if options.knotify:
+		logger.info("Using KNotify for notificaytions")
+		notify = KNotify()
+	else:
+		logger.info("Using Galeon for notificaytions")
+		notify = Notify()
+		
 	if len(args) != 1:
 		sys.exit("Missing profile file argument")
 	profile = Profile(args[0])
@@ -272,9 +316,9 @@ def main():
 		try:
 			snap.restoreFromPath(options.restorePath)
 		except FilterFileError as e:
-			print "ERROR: %s" % e
+			logger.error(e)
 		except IOError as e:
-			print "ERROR: %s" % e
+			logger.error(e)
 	else:
 		path = snap.takeSnapshot()
 
