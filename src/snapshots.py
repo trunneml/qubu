@@ -169,7 +169,7 @@ class Snapshots:
 		
 		# Create Rsync CMD
 		logger.info("Starting rsync")
-		cmd  = '%s -i' % rsyncCMD
+		cmd  = '%s -stats' % rsyncCMD
 		if lastSnapshot:
 			cmd += ' --link-dest="%s"' % os.path.join(lastSnapshot, self.BACKUPDIR)
 		cmd += ' --include-from="%s"' % filterFile
