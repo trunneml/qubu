@@ -2,6 +2,7 @@
 # -*- coding: utf-8 -*-
 from __future__ import with_statement # This isn't required in Python 2.6
 import os
+import subprocess
 import sys
 import getopt
 import datetime
@@ -58,7 +59,7 @@ class FilterFileError(Exception):
 	def __str__(self):
 		return repr(self.value)
 
-class RSYNCError(Exception):
+class RsyncError(Exception):
 	def __init__(self, returnValue):
 		self.exitCode = returnValue
 	def __str__(self):
@@ -168,6 +169,7 @@ class Snapshots:
 		tmpSnapshot = os.path.join(snapshotDir, "tmpnew")
 		if os.path.exists(tmpSnapshot):
 			logger.warn("Found tmp folder! Maybe backup is already running")
+			notify.notify(Notify.STOPBACKUP, "TEMP-Folder found for profile %s. No backup was taken!" % self.profile)
 			return False
 		
 		lastSnapshot = self.getLastSnapshot()
@@ -187,8 +189,11 @@ class Snapshots:
 		cmd += ' > %s' % os.path.join(tmpSnapshot, self.RSYNCOUTPUT)
 		# Run RSYNC and proof return value
 		logger.debug( "Running command: %s" % cmd) 
-		rsyncReturnValue = os.system( cmd )
-		if rsyncReturnValue != 0:
+		rsyncReturnValue = subprocess.call( cmd, shell=True )
+		if rsyncReturnValue not in [0,24]:
+			cmd = 'rm -Rf %s' % tmpSnapshot
+			logger.debug( "Running command: %s" % cmd) 
+			os.system( cmd )
 			raise RsyncError(rsyncReturnValue)
 		
 		# Save a copy of the filterFile
