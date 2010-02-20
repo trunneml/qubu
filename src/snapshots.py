@@ -106,9 +106,10 @@ class Profile:
 
 class Snapshots:
 
-	RSYNCLOG = "rsync.log"
-	BACKUPDIR = "backup"
-	FILEINFO = "fileinfo.bz2"
+	RSYNCLOG   = "rsync.log"
+	RSYNCSTATS = "rsync.stats"
+	BACKUPDIR  = "backup"
+	FILEINFO   = "fileinfo.bz2"
 	RSYNCFILTERFILE = "rsync.rules"
 
 	def __init__(self, profile):
@@ -193,8 +194,9 @@ class Snapshots:
 		if lastSnapshot:
 			cmd += ' --link-dest="%s"' % os.path.join(lastSnapshot, self.BACKUPDIR)
 		cmd += ' --include-from="%s"' % filterFile
+		cmd += ' --log-file="%s"' % self.RSYNCLOG
 		cmd += ' "%s" "%s"' % (sourceDir, cleanupPath(os.path.join(tmpSnapshot, self.BACKUPDIR)))
-		cmd += ' > %s' % os.path.join(tmpSnapshot, self.RSYNCLOG)
+		cmd += ' > %s' % os.path.join(tmpSnapshot, self.RSYNCSTATS)
 		# Run RSYNC and proof return value
 		logger.debug( "Running command: %s" % cmd) 
 		rsyncReturnValue = os.system( cmd )
