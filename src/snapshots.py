@@ -58,6 +58,12 @@ class FilterFileError(Exception):
 	def __str__(self):
 		return repr(self.value)
 
+class RSYNCError(Exception):
+	def __init__(self, returnValue):
+		self.exitCode = returnValue
+	def __str__(self):
+		return "RSYNC exit code was %i" % self.exitCode
+
 class Profile:
 	def __init__(self, filterFile):
 		logger.info("Loading qubu filter file")
@@ -80,6 +86,9 @@ class Profile:
 		self.rsyncCMD = "rsync -aEAXH"
 		if rsyncCMDLine[0] == "#":
 			self.rsyncCMD = rsyncCMDLine[1:].strip()
+
+	def __str__(self):
+		return os.path.split(self.filterFile)[1]
 		
 
 	_sourceDirectory = None
@@ -139,7 +148,7 @@ class Snapshots:
 		filterFile = self.profile.filterFile
 		rsyncCMD = self.profile.rsyncCMD
 		
-		logger.info("Checking snapshot configuration")
+		logger.info("Checking snapshot configuration of profile %s" % self.profile)
 		# Proof profile settings
 		if not os.path.isdir(snapshotDir):
 			raise IOError(1, 'Snapshot directory "%s" is not a directory' % snapshotDir)
@@ -151,7 +160,7 @@ class Snapshots:
 		# RSYNC behaves different with a / at the end of the source folder
 		if sourceDir[-1] != "/":
 			sourceDir += "/"
-		notify.notify(Notify.STARTBACKUP, "Starting Backup")
+		notify.notify(Notify.STARTBACKUP, "Starting Backup with profile %s" % self.profile)
 		
 		# Define folder names for tmp dir and new snapshot
 		snapshotID = self.generateSnapshotID()
@@ -180,7 +189,7 @@ class Snapshots:
 		logger.debug( "Running command: %s" % cmd) 
 		rsyncReturnValue = os.system( cmd )
 		if rsyncReturnValue != 0:
-			raise RuntimeError(1, "rsync exit with %i exit code" % rsyncReturnValue)
+			raise RsyncError(rsyncReturnValue)
 		
 		# Save a copy of the filterFile
 		logger.info("Copy qubu filter file")
@@ -263,7 +272,15 @@ def main():
 		except IOError as e:
 			logger.error(e)
 	else:
-		path = snap.takeSnapshot()
+		try:
+			path = snap.takeSnapshot()
+		except RsyncError as e:
+			logger.error(e)
+			sys.exit(e.exitCode)
+		except IOError as e:
+			logger.error(e)
+			sys.exit('%s' % e)
+			
 
 if __name__ == "__main__":
 	main()
