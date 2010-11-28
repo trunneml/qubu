@@ -19,6 +19,10 @@ import grp
 # Make some fancy PopUps under KDE4 and Gnome
 import dbus
 
+# Needed for removing old Snapshots
+import time
+import datetime
+
 logger = None
 notify = None
 appName = "qubu"
@@ -246,6 +250,42 @@ class Snapshots:
 		retVal = os.system( cmd )
 		return retVal == 0
 
+	def removeOldSnapshots(self):
+		snapshotDir = self.profile.snapshotDirectory
+		
+		logger.info("Checking snapshot configuration of profile %s" % self.profile)
+		# Proof profile settings
+		if not os.path.isdir(snapshotDir):
+			raise IOError(1, 'Snapshot directory "%s" is not a directory' % snapshotDir)
+
+		# collect all snapshots in the snapshotDirectory
+		snapshots = filter( lambda x: os.path.isdir(os.path.join(snapshotDir, x)), os.listdir(snapshotDir))
+		snapshots.sort(None, lambda x: os.path.getctime(os.path.join(snapshotDir, x)) )
+		snapshots = map ( lambda x: cleanupPath(os.path.join(snapshotDir, x)), snapshots ) 
+		snapshots = map ( lambda x: ( os.path.getctime(x), x), snapshots ) 
+		if len(snapshots) == 0:
+			logger.warn("No old snapshots found in: %s" % snapshotDir)
+			return
+		logger.info("Found %i old snapshots in: %s" % (len(snapshots) , snapshotDir) )
+
+		nowt = time.time()
+		dayt = 60*60*24
+		weekt = dayt * 7
+		# Do not remove a backup of the last 7 days
+		logger.debug("Keeping all backups of the last 7 days" )
+		snapshots = filter ( lambda x: (nowt - weekt) > x[0] , snapshots)
+		beforeKeeped = None
+		for snap in snapshots:
+			snapDate = datetime.date.fromtimestamp(snap[0]) 
+			if snapDate == beforeKeeped:
+				logger.info("Removing backup: %s" % snap[1] )
+				cmd  = 'rm -Rf "%s"' % snap[1]
+				logger.debug( "Running command: %s" % cmd) 
+				os.system( cmd )
+			else:
+				logger.debug("Keeping backup: %s" % snap[1] )
+				beforeKeeped = snapDate
+	
 def main():
 	global logger
 	global notify
@@ -253,6 +293,7 @@ def main():
 	parser = optparse.OptionParser(usage=usage)
 	#parser.add_option("-p", "--profile", dest="profileFile", help="PATH to QUBU profile", metavar="PATH")
 	parser.add_option("-r", "--restore", dest="restorePath", help="restore PATH from snapshot (Full path including snapshot path)", metavar="PATH")
+	parser.add_option("-c", "--clean", dest="removeOld", help="Remove/reduce old Snapshots", action="store_true")
 	parser.add_option("-q", "--quiet", dest="quiet", action="store_true", help="Decrease Verbose Level (only Warnings and above)")
 	parser.add_option("-d", "--debug", dest="debug", action="store_true", help="Debug Output")
 	(options, args) = parser.parse_args()
@@ -276,6 +317,13 @@ def main():
 			logger.error(e)
 		except IOError as e:
 			logger.error(e)
+	elif options.removeOld:
+		try:
+			snap.removeOldSnapshots()
+		except FilterFileError as e:
+			logger.error(e)
+		except IOError as e:
+			logger.error(e)	
 	else:
 		try:
 			path = snap.takeSnapshot()
