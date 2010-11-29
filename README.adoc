@@ -1,17 +1,17 @@
-QUBU - Quick User BackUp
+= QUBU - Quick User BackUp
 Michael Trunner <michael@trunner.de>
 Last changed: 2010-11-29
 
 
-= About =
+== About
 
 QUBU creates snapshots of your $HOME. It is written in Python and uses rsync as backend and crond to schedule the backup task.
 
 It's primary goal is to be a minimalistic, simple and functional backup tool and not to be very eye-candy.
 
-= Usage =
+== Usage
 
-{{{
+----
 Usage: snapshots.py [options] profile
 
 Options:
@@ -22,9 +22,9 @@ Options:
   -c, --clean           Remove/reduce old Snapshots
   -q, --quiet           Decrease Verbose Level (only Warnings and above)
   -d, --debug           Debug Output
-}}}
+----
 
-= Configuration =
+== Configuration
 
 A qubu profile is a normal rsync filter file with two or three header lines starting with a "#". This way rsync will ignore them.
 
@@ -34,9 +34,9 @@ The third line is optional and defines the rsync command call with its parameter
 
 For more details of the rsync filter option take a look into the rsync manpage and documentation. 
 
-== Example profile ==
+=== Example profile
 
-{{{
+----
 # /home/qubu-user
 # /media/backupdisks/qubu-backup
 - Downloads
@@ -48,36 +48,36 @@ For more details of the rsync filter option take a look into the rsync manpage a
 - .kde4/share/apps/nepomuk
 - .kde4/share/apps/kmail/imap/
 - .local/share/akonadi/db_data
-}}}
+----
 
-= Setting up a cron job =
+== Setting up a cron job
 
 Your cron daemon should run qubu as a cron job. A cronjob can be create with:
 
-{{{
+----
 crontab -e
-}}}
+----
 
-But please take a look at your cron daemon documentation at least take a look at man crontab.
+But please take a look at your cron daemon documentation at least take a look at +man crontab+.
 
 A dcron ( the default cron daemon on archlinux)  crontab entry for qubu can look like this:
 
-{{{
+----
 @hourly qubu.py ~/.qubu/home  >> ~/.qubu/home.log 2>&1
-}}}
+----
 
 This cron job will start qubu every our. The profile is stored at ~/.qubu/home and all output is redirected to ~/.qubu/home
 
-**Note:** If you don't redirect the qubu output your cron daemon will try to deliver it via mail.
+*Note:* If you don't redirect the qubu output your cron daemon will try to deliver it via mail.
 
 The crontab entry above works but it will consume nearly all IQ bandwidth and CPU resources it can get.
-To reduce the consuming you can use nice and ionice:
+To reduce the consuming you can use +nice+ and +ionice+:
 
-{{{
+----
 @hourly ID=qubu nice -n 19 ionice -c2 -n7 /home/trunneml/bin/qubu.py ~/.qubu/home  >> ~/.qubu/home.log 2>&1
-}}}
+----
 
-= License =
+== License
 
 This program is free software: you can redistribute it and/or modify
 it under the terms of the GNU General Public License as published by
@@ -90,5 +90,5 @@ MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
 GNU General Public License for more details.
 
 You should have received a copy of the GNU General Public License
-along with this program.  If not, see <[[http://www.gnu.org/licenses/]]>.
+along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
