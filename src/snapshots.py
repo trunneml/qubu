@@ -1,4 +1,4 @@
-#!/usr/bin/python
+#!/usr/bin/python2
 # -*- coding: utf-8 -*-
 from __future__ import with_statement # This isn't required in Python 2.6
 import os
@@ -83,7 +83,7 @@ class Profile:
 		if sourceLine[0] != "#":
 			raise FilterFileError('First line must be an source directory line')
 		if snapshotLine[0] != "#":
-			raise FilterFileError('Second line must be an source directory line')
+			raise FilterFileError('Second line must be an snapshot directory line')
 		self.sourceDirectory = sourceLine[1:].strip()
 		logger.info("Setting source directory to: %s" % self.sourceDirectory)
 		self.snapshotDirectory = snapshotLine[1:].strip()
